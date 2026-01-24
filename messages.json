@@ -1,0 +1,57 @@
+[
+  {
+    "name": "ともい",
+    "text": "間"
+  },
+  {
+    "type": "system",
+    "text": "📢 破壊 さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "text": "破壊： あさこ"
+  },
+  {
+    "type": "system",
+    "text": "📢 タカハシ トモイ さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "text": "タカハシ トモイ： 嗚呼"
+  },
+  {
+    "type": "chat",
+    "text": "タカハシ トモイ： くぅ"
+  },
+  {
+    "type": "chat",
+    "text": "タカハシ トモイ： SSD"
+  },
+  {
+    "type": "system",
+    "text": "📢 タカハシ トモイ さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "name": "タカハシ トモイ",
+    "text": "嗚呼"
+  },
+  {
+    "type": "system",
+    "text": "📢 ともい さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "name": "ともい",
+    "text": "それ"
+  },
+  {
+    "type": "system",
+    "text": "📢 ジャイアン さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "name": "ジャイアン",
+    "text": "おっす"
+  }
+]
