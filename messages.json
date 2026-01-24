@@ -53,5 +53,14 @@
     "type": "chat",
     "name": "ジャイアン",
     "text": "おっす"
+  },
+  {
+    "type": "system",
+    "text": "📢 ともい さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "name": "ともい",
+    "text": "接続"
   }
 ]
