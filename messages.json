@@ -80,5 +80,14 @@
     "type": "chat",
     "name": "H",
     "text": "Hhhh"
+  },
+  {
+    "type": "system",
+    "text": "📢 あ さんが参加しました"
+  },
+  {
+    "type": "chat",
+    "name": "あ",
+    "text": "SSD"
   }
 ]
