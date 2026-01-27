@@ -8,6 +8,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const HISTORY_FILE = "history.txt";
+
 app.use("/stamps", express.static("stamps"));
 
 if (!fs.existsSync(HISTORY_FILE)) {
@@ -15,12 +16,11 @@ if (!fs.existsSync(HISTORY_FILE)) {
 }
 
 app.get("/", (req, res) => {
-res.send(`
-<!DOCTYPE html>
+res.send(`<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<title>My Chat</title>
+<title>Project Viewer</title>
 
 <style>
 body {
@@ -32,18 +32,25 @@ body {
 #header {
   position: fixed;
   top: 0;
+  left: 0;
   width: 100%;
-  padding: 12px 16px;
+  height: 56px;
+  padding: 0 16px;
   background: linear-gradient(135deg,#4facfe,#00f2fe);
   color: white;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   box-sizing: border-box;
   z-index: 10;
 }
 
 #container {
-  padding: 80px 12px 90px;
+  padding: 70px 12px 90px;
+}
+
+#nameArea {
+  margin-top: 40px;
 }
 
 #messages {
@@ -59,6 +66,7 @@ body {
   padding: 10px 14px;
   margin: 8px 0;
   border-radius: 18px;
+  word-break: break-word;
 }
 
 .me { background: #9effa1; margin-left: auto; }
@@ -68,6 +76,7 @@ body {
   text-align: center;
   font-size: 13px;
   color: #555;
+  margin: 6px 0;
 }
 
 .chat-img {
@@ -79,6 +88,7 @@ body {
 #inputArea {
   position: fixed;
   bottom: 0;
+  left: 0;
   width: 100%;
   background: white;
   padding: 6px;
@@ -90,15 +100,16 @@ body {
 
 #msg {
   flex: 1;
+  height: 36px;
+}
+
+#imageInput {
+  width: 120px;
 }
 
 .stamp {
   width: 32px;
   cursor: pointer;
-}
-
-#imageInput {
-  width: 120px;
 }
 </style>
 </head>
@@ -106,7 +117,7 @@ body {
 <body>
 
 <div id="header">
-  <div>💬 My Chat</div>
+  <div>📘 Project Viewer</div>
   <div id="myNameView"></div>
 </div>
 
@@ -122,8 +133,8 @@ body {
 <div id="inputArea">
   <img src="/stamps/stamp1.png" class="stamp" onclick="sendStamp('stamp1.png')">
   <input type="file" id="imageInput" accept="image/*">
-  <input id="msg" placeholder="メッセージ">
-  <button onclick="send()">送信</button>
+  <input id="msg" placeholder="メッセージ（Enter送信 / Shift+Enter改行）">
+  <button id="sendBtn">送信</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -186,33 +197,35 @@ function enter(name) {
 if (myName) enter(myName);
 
 document.getElementById("nameBtn").onclick = () => {
-  if (!nameInput.value) return;
-  enter(nameInput.value);
+  if (!nameInput.value.trim()) return;
+  enter(nameInput.value.trim());
 };
 
 function send() {
-  const text = msgInput.value;
+  const text = msgInput.value.trim();
   const file = imageInput.files[0];
 
   if (!text && !file) return;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    socket.emit("chat", {
-      text: text,
-      image: file ? reader.result : null
-    });
-    msgInput.value = "";
-    imageInput.value = "";
-  };
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      socket.emit("chat", { text, image: reader.result });
+    };
+    reader.readAsDataURL(file);
+  } else {
+    socket.emit("chat", { text, image: null });
+  }
 
-  if (file) reader.readAsDataURL(file);
-  else reader.onload();
+  msgInput.value = "";
+  imageInput.value = "";
 }
 
 function sendStamp(file) {
-  socket.emit("chat", { image: "/stamps/" + file });
+  socket.emit("chat", { text: "", image: "/stamps/" + file });
 }
+
+document.getElementById("sendBtn").onclick = send;
 
 msgInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
@@ -227,8 +240,7 @@ socket.on("system", t => addSystem(t));
 </script>
 
 </body>
-</html>
-`);
+</html>`);
 });
 
 io.on("connection", socket => {
@@ -236,7 +248,7 @@ io.on("connection", socket => {
     if (socket.username) return;
     socket.username = name;
 
-    fs.readFileSync(HISTORY_FILE,"utf8")
+    fs.readFileSync(HISTORY_FILE, "utf8")
       .split("\\n")
       .filter(Boolean)
       .forEach(l => socket.emit("history", JSON.parse(l)));
