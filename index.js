@@ -105,7 +105,6 @@ body {
 <div id="header">
   <div>📘 Project Viewer</div>
   <div id="myNameView"></div>
-  <button id="adminClearBtn" style="display:none;">🗑 履歴削除</button>
 </div>
 
 </button>
@@ -113,8 +112,7 @@ body {
 <div id="container">
   <div id="nameArea">
     <input id="nameInput" placeholder="名前を入力">
-    <button onclick="localStorage.clear(); location.reload();">
-      ローカルストレージ全消し
+    
     <button id="nameBtn">入室</button>
   </div>
   <div id="messages"></div>
@@ -124,6 +122,8 @@ body {
   <img src="/stamps/stamp1.png" class="stamp" onclick="sendStamp('stamp1.png')">
   <input type="file" id="imageInput" accept="image/*">
   <input id="msg" placeholder="メッセージ（Enter送信 / Shift+Enter改行）">
+  <button onclick="localStorage.clear(); location.reload();">
+    ローカルストレージ全消し
   <button id="sendBtn">送信</button>
 </div>
 
