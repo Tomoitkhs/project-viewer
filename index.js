@@ -1,150 +1,267 @@
 const express = require("express");
 const http = require("http");
-const { Server } = require("socket.io");
 const fs = require("fs");
-const path = require("path");
+const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files from the public directory
-app.use(express.static("public"));
+const HISTORY_FILE = "history.txt";
+app.use("/stamps", express.static("stamps"));
 
-const FILE = "messages.json";
-
-// 履歴読み込み
-let messages = [];
-if (fs.existsSync(FILE)) {
-  messages = JSON.parse(fs.readFileSync(FILE, "utf8"));
-}
-
-function saveMessages() {
-  fs.writeFileSync(FILE, JSON.stringify(messages, null, 2));
+if (!fs.existsSync(HISTORY_FILE)) {
+  fs.writeFileSync(HISTORY_FILE, "");
 }
 
 app.get("/", (req, res) => {
-  res.send(`
+res.send(`
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>チャット</title>
-  <style>
-    body { font-family: sans-serif; }
-    ul { list-style: none; padding: 0; }
+<meta charset="UTF-8">
+<title>My Chat</title>
 
-    li {
-      margin: 6px 0;
-      padding: 6px 10px;
-      max-width: 70%;
-      border-radius: 8px;
-    }
+<style>
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #7ac7ff;
+}
 
-    .mine {
-      background: #aee1ff;
-      margin-left: auto;
-      text-align: right;
-    }
+#header {
+  position: fixed;
+  top: 0;
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg,#4facfe,#00f2fe);
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  box-sizing: border-box;
+  z-index: 10;
+}
 
-    .other {
-      background: #eee;
-      margin-right: auto;
-    }
+#container {
+  padding: 80px 12px 90px;
+}
 
-    .system {
-      background: none;
-      color: gray;
-      text-align: center;
-      font-style: italic;
-      margin: 10px auto;
-    }
-  </style>
+#messages {
+  display: none;
+  background: #e5f2ff;
+  padding: 10px;
+  border-radius: 12px;
+  min-height: 60vh;
+}
+
+.bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  margin: 8px 0;
+  border-radius: 18px;
+}
+
+.me { background: #9effa1; margin-left: auto; }
+.other { background: white; }
+
+.system {
+  text-align: center;
+  font-size: 13px;
+  color: #555;
+}
+
+.chat-img {
+  max-width: 180px;
+  margin-top: 6px;
+  border-radius: 10px;
+}
+
+#inputArea {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: white;
+  padding: 6px;
+  display: none;
+  gap: 6px;
+  box-sizing: border-box;
+  align-items: center;
+}
+
+#msg {
+  flex: 1;
+}
+
+.stamp {
+  width: 32px;
+  cursor: pointer;
+}
+
+#imageInput {
+  width: 120px;
+}
+</style>
 </head>
+
 <body>
-  <h1>💬 右寄せチャット</h1>
 
-  <input id="name" placeholder="名前">
-  <br><br>
+<div id="header">
+  <div>💬 My Chat</div>
+  <div id="myNameView"></div>
+</div>
 
-  <input id="message" placeholder="メッセージ">
-  <input type="image" src="/images/send-button.png" onclick="send()" style="width: 80px; vertical-align: middle; cursor: pointer;">
+<div id="container">
+  <div id="nameArea">
+    <input id="nameInput" placeholder="名前を入力">
+    <button id="nameBtn">入室</button>
+  </div>
 
-  <ul id="messages"></ul>
+  <div id="messages"></div>
+</div>
 
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    let myName = "";
+<div id="inputArea">
+  <img src="/stamps/stamp1.png" class="stamp" onclick="sendStamp('stamp1.png')">
+  <input type="file" id="imageInput" accept="image/*">
+  <input id="msg" placeholder="メッセージ">
+  <button onclick="send()">送信</button>
+</div>
 
-    function addMessage(data) {
-      const li = document.createElement("li");
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
 
-      if (data.type === "system") {
-        li.textContent = data.text;
-        li.className = "system";
-      } else {
-        li.textContent = data.name + "： " + data.text;
-        li.className = (data.name === myName) ? "mine" : "other";
-      }
+const messages = document.getElementById("messages");
+const nameArea = document.getElementById("nameArea");
+const inputArea = document.getElementById("inputArea");
+const nameInput = document.getElementById("nameInput");
+const myNameView = document.getElementById("myNameView");
+const msgInput = document.getElementById("msg");
+const imageInput = document.getElementById("imageInput");
 
-      document.getElementById("messages").appendChild(li);
-    }
+let myName = localStorage.getItem("chatName");
 
-    socket.on("history", (history) => {
-      history.forEach(addMessage);
+function addBubble(data, isMe) {
+  const div = document.createElement("div");
+  div.className = "bubble " + (isMe ? "me" : "other");
+
+  const name = document.createElement("strong");
+  name.textContent = data.name;
+  div.appendChild(name);
+
+  if (data.text) {
+    const p = document.createElement("div");
+    p.textContent = data.text;
+    div.appendChild(p);
+  }
+
+  if (data.image) {
+    const img = document.createElement("img");
+    img.src = data.image;
+    img.className = "chat-img";
+    div.appendChild(img);
+  }
+
+  messages.appendChild(div);
+  window.scrollTo(0, document.body.scrollHeight);
+}
+
+function addSystem(text) {
+  const div = document.createElement("div");
+  div.className = "system";
+  div.textContent = text;
+  messages.appendChild(div);
+}
+
+function enter(name) {
+  myName = name;
+  localStorage.setItem("chatName", myName);
+  myNameView.textContent = "👤 " + myName;
+
+  socket.emit("join", myName);
+  nameArea.style.display = "none";
+  messages.style.display = "block";
+  inputArea.style.display = "flex";
+}
+
+if (myName) enter(myName);
+
+document.getElementById("nameBtn").onclick = () => {
+  if (!nameInput.value) return;
+  enter(nameInput.value);
+};
+
+function send() {
+  const text = msgInput.value;
+  const file = imageInput.files[0];
+
+  if (!text && !file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    socket.emit("chat", {
+      text: text,
+      image: file ? reader.result : null
     });
+    msgInput.value = "";
+    imageInput.value = "";
+  };
 
-    function send() {
-      const nameInput = document.getElementById("name");
-      const msgInput = document.getElementById("message");
+  if (file) reader.readAsDataURL(file);
+  else reader.onload();
+}
 
-      if (!myName) {
-        myName = nameInput.value;
-        if (!myName) return;
-        socket.emit("join", myName);
-        nameInput.disabled = true;
-      }
+function sendStamp(file) {
+  socket.emit("chat", { image: "/stamps/" + file });
+}
 
-      if (!msgInput.value) return;
+msgInput.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
 
-      socket.emit("chat message", {
-        type: "chat",
-        name: myName,
-        text: msgInput.value
-      });
+socket.on("history", d => addBubble(d, d.name === myName));
+socket.on("chat", d => addBubble(d, d.name === myName));
+socket.on("system", t => addSystem(t));
+</script>
 
-      msgInput.value = "";
-    }
-
-    socket.on("chat message", addMessage);
-  </script>
 </body>
 </html>
-  `);
+`);
 });
 
-io.on("connection", (socket) => {
-  socket.emit("history", messages);
+io.on("connection", socket => {
+  socket.on("join", name => {
+    if (socket.username) return;
+    socket.username = name;
 
-  socket.on("join", (name) => {
+    fs.readFileSync(HISTORY_FILE,"utf8")
+      .split("\\n")
+      .filter(Boolean)
+      .forEach(l => socket.emit("history", JSON.parse(l)));
+
+    io.emit("system", "🔔 " + name + " が入室しました");
+  });
+
+  socket.on("chat", data => {
+    if (!socket.username) return;
+
     const msg = {
-      type: "system",
-      text: "📢 " + name + " さんが参加しました"
+      name: socket.username,
+      text: data.text || "",
+      image: data.image || null
     };
-    messages.push(msg);
-    saveMessages();
-    io.emit("chat message", msg);
+
+    fs.appendFileSync(HISTORY_FILE, JSON.stringify(msg) + "\\n");
+    io.emit("chat", msg);
   });
 
-  socket.on("chat message", (data) => {
-    messages.push(data);
-    saveMessages();
-    io.emit("chat message", data);
+  socket.on("disconnect", () => {
+    if (socket.username) {
+      io.emit("system", "🚪 " + socket.username + " が退出しました");
+    }
   });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("Server started on port " + PORT);
-});
+server.listen(3000, () => console.log("Server started"));
