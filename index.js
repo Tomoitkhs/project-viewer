@@ -1,19 +1,37 @@
+const { Pool } = require("pg");
 const express = require("express");
 const http = require("http");
-const fs = require("fs");
+
 const { Server } = require("socket.io");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id SERIAL PRIMARY KEY,
+      name TEXT,
+      text TEXT,
+      image TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+}
+
+initDB();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const HISTORY_FILE = "history.txt";
+
 
 app.use("/stamps", express.static("stamps"));
 
-if (!fs.existsSync(HISTORY_FILE)) {
-  fs.writeFileSync(HISTORY_FILE, "");
-}
+
+
 
 app.get("/", (req, res) => {
 res.send(`<!DOCTYPE html>
@@ -248,10 +266,14 @@ io.on("connection", socket => {
     if (socket.username) return;
     socket.username = name;
 
-    fs.readFileSync(HISTORY_FILE, "utf8")
-      .split("\\n")
-      .filter(Boolean)
-      .forEach(l => socket.emit("history", JSON.parse(l)));
+    const result = await pool.query(
+      "SELECT name, text, image FROM messages ORDER BY id ASC LIMIT 100"
+    );
+
+    result.rows.forEach(row => {
+      socket.emit("history", row);
+    });
+
 
     io.emit("system", "🔔 " + name + " が入室しました");
   });
@@ -265,8 +287,11 @@ io.on("connection", socket => {
       image: data.image || null
     };
 
-    fs.appendFileSync(HISTORY_FILE, JSON.stringify(msg) + "\\n");
-    io.emit("chat", msg);
+    await pool.query(
+      "INSERT INTO messages (name, text, image) VALUES ($1,$2,$3)",
+      [msg.name, msg.text, msg.image]
+    );
+
   });
 
   socket.on("disconnect", () => {
