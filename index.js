@@ -1,56 +1,51 @@
-const { Pool } = require("pg");
 const express = require("express");
 const http = require("http");
-
 const { Server } = require("socket.io");
+const { Pool } = require("pg");
+
+// ===== DB設定 =====
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-async function initDB() {
+// 起動時にテーブル作成
+(async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS messages (
       id SERIAL PRIMARY KEY,
-      name TEXT,
+      name TEXT NOT NULL,
       text TEXT,
       image TEXT,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
-}
+  console.log("DB ready");
+})();
 
-initDB();
-
+// ===== サーバー =====
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-
-
 app.use("/stamps", express.static("stamps"));
 
-
-
-
+// ===== HTML =====
 app.get("/", (req, res) => {
 res.send(`<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <title>Project Viewer</title>
-
 <style>
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   background: #7ac7ff;
 }
-
 #header {
   position: fixed;
-  top: 0;
-  left: 0;
+  top: 0; left: 0;
   width: 100%;
   height: 56px;
   padding: 0 16px;
@@ -62,15 +57,7 @@ body {
   box-sizing: border-box;
   z-index: 10;
 }
-
-#container {
-  padding: 70px 12px 90px;
-}
-
-#nameArea {
-  margin-top: 40px;
-}
-
+#container { padding: 70px 12px 90px; }
 #messages {
   display: none;
   background: #e5f2ff;
@@ -78,7 +65,6 @@ body {
   border-radius: 12px;
   min-height: 60vh;
 }
-
 .bubble {
   max-width: 70%;
   padding: 10px 14px;
@@ -86,27 +72,21 @@ body {
   border-radius: 18px;
   word-break: break-word;
 }
-
 .me { background: #9effa1; margin-left: auto; }
 .other { background: white; }
-
 .system {
   text-align: center;
   font-size: 13px;
   color: #555;
-  margin: 6px 0;
 }
-
 .chat-img {
   max-width: 180px;
   margin-top: 6px;
   border-radius: 10px;
 }
-
 #inputArea {
   position: fixed;
-  bottom: 0;
-  left: 0;
+  bottom: 0; left: 0;
   width: 100%;
   background: white;
   padding: 6px;
@@ -115,28 +95,17 @@ body {
   box-sizing: border-box;
   align-items: center;
 }
-
-#msg {
-  flex: 1;
-  height: 36px;
-}
-
-#imageInput {
-  width: 120px;
-}
-
-.stamp {
-  width: 32px;
-  cursor: pointer;
-}
+#msg { flex: 1; height: 36px; }
+#imageInput { width: 120px; }
+.stamp { width: 32px; cursor: pointer; }
 </style>
 </head>
 
 <body>
-
 <div id="header">
   <div>📘 Project Viewer</div>
   <div id="myNameView"></div>
+  <button id="adminClearBtn" style="display:none;">🗑 履歴削除</button>
 </div>
 
 <div id="container">
@@ -144,7 +113,6 @@ body {
     <input id="nameInput" placeholder="名前を入力">
     <button id="nameBtn">入室</button>
   </div>
-
   <div id="messages"></div>
 </div>
 
@@ -158,7 +126,6 @@ body {
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const socket = io();
-
 const messages = document.getElementById("messages");
 const nameArea = document.getElementById("nameArea");
 const inputArea = document.getElementById("inputArea");
@@ -166,30 +133,32 @@ const nameInput = document.getElementById("nameInput");
 const myNameView = document.getElementById("myNameView");
 const msgInput = document.getElementById("msg");
 const imageInput = document.getElementById("imageInput");
+const adminBtn = document.getElementById("adminClearBtn");
+
+const adminPassword = prompt("管理者ですか？（違ったらキャンセル）");
+
+if (adminPassword) {
+  socket.emit("admin-check", adminPassword);
+}
+
+socket.on("admin-ok", () => {
+  adminBtn.style.display = "inline-block";
+});
+
+adminBtn.onclick = () => {
+  if (!confirm("履歴をすべて削除します。よろしいですか？")) return;
+  socket.emit("admin-clear");
+};
+
 
 let myName = localStorage.getItem("chatName");
 
 function addBubble(data, isMe) {
   const div = document.createElement("div");
   div.className = "bubble " + (isMe ? "me" : "other");
-
-  const name = document.createElement("strong");
-  name.textContent = data.name;
-  div.appendChild(name);
-
-  if (data.text) {
-    const p = document.createElement("div");
-    p.textContent = data.text;
-    div.appendChild(p);
-  }
-
-  if (data.image) {
-    const img = document.createElement("img");
-    img.src = data.image;
-    img.className = "chat-img";
-    div.appendChild(img);
-  }
-
+  div.innerHTML = "<strong>" + data.name + "</strong>";
+  if (data.text) div.innerHTML += "<div>" + data.text + "</div>";
+  if (data.image) div.innerHTML += '<img src="' + data.image + '" class="chat-img">';
   messages.appendChild(div);
   window.scrollTo(0, document.body.scrollHeight);
 }
@@ -205,7 +174,6 @@ function enter(name) {
   myName = name;
   localStorage.setItem("chatName", myName);
   myNameView.textContent = "👤 " + myName;
-
   socket.emit("join", myName);
   nameArea.style.display = "none";
   messages.style.display = "block";
@@ -222,14 +190,11 @@ document.getElementById("nameBtn").onclick = () => {
 function send() {
   const text = msgInput.value.trim();
   const file = imageInput.files[0];
-
   if (!text && !file) return;
 
   if (file) {
     const reader = new FileReader();
-    reader.onload = () => {
-      socket.emit("chat", { text, image: reader.result });
-    };
+    reader.onload = () => socket.emit("chat", { text, image: reader.result });
     reader.readAsDataURL(file);
   } else {
     socket.emit("chat", { text, image: null });
@@ -244,7 +209,6 @@ function sendStamp(file) {
 }
 
 document.getElementById("sendBtn").onclick = send;
-
 msgInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -256,29 +220,26 @@ socket.on("history", d => addBubble(d, d.name === myName));
 socket.on("chat", d => addBubble(d, d.name === myName));
 socket.on("system", t => addSystem(t));
 </script>
-
 </body>
 </html>`);
 });
 
+// ===== Socket.io =====
 io.on("connection", socket => {
-  socket.on("join", name => {
+
+  socket.on("join", async name => {
     if (socket.username) return;
     socket.username = name;
 
     const result = await pool.query(
       "SELECT name, text, image FROM messages ORDER BY id ASC LIMIT 100"
     );
-
-    result.rows.forEach(row => {
-      socket.emit("history", row);
-    });
-
+    result.rows.forEach(row => socket.emit("history", row));
 
     io.emit("system", "🔔 " + name + " が入室しました");
   });
 
-  socket.on("chat", data => {
+  socket.on("chat", async data => {
     if (!socket.username) return;
 
     const msg = {
@@ -292,6 +253,7 @@ io.on("connection", socket => {
       [msg.name, msg.text, msg.image]
     );
 
+    io.emit("chat", msg);
   });
 
   socket.on("disconnect", () => {
@@ -299,8 +261,23 @@ io.on("connection", socket => {
       io.emit("system", "🚪 " + socket.username + " が退出しました");
     }
   });
+
+  socket.on("admin-check", password => {
+    if (password === process.env.ADMIN_PASSWORD) {
+      socket.isAdmin = true;
+      socket.emit("admin-ok");
+    }
+  });
+
+  socket.on("admin-clear", async () => {
+    if (!socket.isAdmin) return;
+
+    await pool.query("DELETE FROM messages");
+    io.emit("system", "🗑 管理者により履歴が削除されました");
+  });
 });
 
+// ===== 起動 =====
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log("Server started on port " + PORT);
