@@ -108,9 +108,13 @@ body {
   <button id="adminClearBtn" style="display:none;">🗑 履歴削除</button>
 </div>
 
+</button>
+
 <div id="container">
   <div id="nameArea">
     <input id="nameInput" placeholder="名前を入力">
+    <button onclick="localStorage.clear(); location.reload();">
+      ローカルストレージ全消し
     <button id="nameBtn">入室</button>
   </div>
   <div id="messages"></div>
