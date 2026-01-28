@@ -105,8 +105,7 @@ body {
 <div id="header">
   <div>📘 Project Viewer</div>
   <div id="myNameView"></div>
-  <button onclick="localStorage.clear(); location.reload();">
-    ローカルストレージ全消し
+  
 </div>
 
 </button>
@@ -114,8 +113,8 @@ body {
 <div id="container">
   <div id="nameArea">
     <input id="nameInput" placeholder="名前を入力">
-    
     <button id="nameBtn">入室</button>
+    
   </div>
   <div id="messages"></div>
 </div>
@@ -124,8 +123,9 @@ body {
   <img src="/stamps/stamp1.png" class="stamp" onclick="sendStamp('stamp1.png')">
   <input type="file" id="imageInput" accept="image/*">
   <input id="msg" placeholder="メッセージ（Enter送信 / Shift+Enter改行）">
-  
   <button id="sendBtn">送信</button>
+  <button onclick="localStorage.clear(); location.reload();">
+    ローカルストレージ全消し
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
