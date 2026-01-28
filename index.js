@@ -9,7 +9,7 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// 起動時にテーブル作成
+// 起動時テーブル作成
 (async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS messages (
@@ -37,12 +37,14 @@ res.send(`<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <title>Project Viewer</title>
+
 <style>
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   background: #7ac7ff;
 }
+
 #header {
   position: fixed;
   top: 0; left: 0;
@@ -57,7 +59,11 @@ body {
   box-sizing: border-box;
   z-index: 10;
 }
-#container { padding: 70px 12px 90px; }
+
+#container {
+  padding: 70px 12px 90px;
+}
+
 #messages {
   display: none;
   background: #e5f2ff;
@@ -65,6 +71,7 @@ body {
   border-radius: 12px;
   min-height: 60vh;
 }
+
 .bubble {
   max-width: 70%;
   padding: 10px 14px;
@@ -72,18 +79,23 @@ body {
   border-radius: 18px;
   word-break: break-word;
 }
+
 .me { background: #9effa1; margin-left: auto; }
 .other { background: white; }
+
 .system {
   text-align: center;
   font-size: 13px;
   color: #555;
+  margin: 6px 0;
 }
+
 .chat-img {
   max-width: 180px;
   margin-top: 6px;
   border-radius: 10px;
 }
+
 #inputArea {
   position: fixed;
   bottom: 0; left: 0;
@@ -95,6 +107,7 @@ body {
   box-sizing: border-box;
   align-items: center;
 }
+
 #msg { flex: 1; height: 36px; }
 #imageInput { width: 120px; }
 .stamp { width: 32px; cursor: pointer; }
@@ -102,19 +115,16 @@ body {
 </head>
 
 <body>
+
 <div id="header">
   <div>📘 Project Viewer</div>
   <div id="myNameView"></div>
-  
 </div>
-
-</button>
 
 <div id="container">
   <div id="nameArea">
     <input id="nameInput" placeholder="名前を入力">
     <button id="nameBtn">入室</button>
-    
   </div>
   <div id="messages"></div>
 </div>
@@ -124,13 +134,15 @@ body {
   <input type="file" id="imageInput" accept="image/*">
   <input id="msg" placeholder="メッセージ（Enter送信 / Shift+Enter改行）">
   <button id="sendBtn">送信</button>
-  <button onclick="localStorage.clear(); location.reload();">
-    ローカルストレージ全消し
+  <button onclick="localStorage.clear(); location.reload();">localStorage削除</button>
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const socket = io();
+window.onload = () => {
+
+const socket = io(location.origin);
+
 const messages = document.getElementById("messages");
 const nameArea = document.getElementById("nameArea");
 const inputArea = document.getElementById("inputArea");
@@ -138,32 +150,17 @@ const nameInput = document.getElementById("nameInput");
 const myNameView = document.getElementById("myNameView");
 const msgInput = document.getElementById("msg");
 const imageInput = document.getElementById("imageInput");
-const adminBtn = document.getElementById("adminClearBtn");
-
-const adminPassword = prompt("管理者ですか？（違ったらキャンセル）");
-
-if (adminPassword) {
-  socket.emit("admin-check", adminPassword);
-}
-
-socket.on("admin-ok", () => {
-  adminBtn.style.display = "inline-block";
-});
-
-adminBtn.onclick = () => {
-  if (!confirm("履歴をすべて削除します。よろしいですか？")) return;
-  socket.emit("admin-clear");
-};
-
 
 let myName = localStorage.getItem("chatName");
 
-function addBubble(data, isMe) {
+function addBubble(data) {
   const div = document.createElement("div");
-  div.className = "bubble " + (isMe ? "me" : "other");
+  div.className = "bubble " + (data.name === myName ? "me" : "other");
+
   div.innerHTML = "<strong>" + data.name + "</strong>";
   if (data.text) div.innerHTML += "<div>" + data.text + "</div>";
   if (data.image) div.innerHTML += '<img src="' + data.image + '" class="chat-img">';
+
   messages.appendChild(div);
   window.scrollTo(0, document.body.scrollHeight);
 }
@@ -179,10 +176,12 @@ function enter(name) {
   myName = name;
   localStorage.setItem("chatName", myName);
   myNameView.textContent = "👤 " + myName;
-  socket.emit("join", myName);
+
   nameArea.style.display = "none";
   messages.style.display = "block";
   inputArea.style.display = "flex";
+
+  socket.emit("join", myName);
 }
 
 if (myName) enter(myName);
@@ -199,7 +198,9 @@ function send() {
 
   if (file) {
     const reader = new FileReader();
-    reader.onload = () => socket.emit("chat", { text, image: reader.result });
+    reader.onload = () => {
+      socket.emit("chat", { text, image: reader.result });
+    };
     reader.readAsDataURL(file);
   } else {
     socket.emit("chat", { text, image: null });
@@ -214,6 +215,7 @@ function sendStamp(file) {
 }
 
 document.getElementById("sendBtn").onclick = send;
+
 msgInput.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -221,10 +223,13 @@ msgInput.addEventListener("keydown", e => {
   }
 });
 
-socket.on("history", d => addBubble(d, d.name === myName));
-socket.on("chat", d => addBubble(d, d.name === myName));
-socket.on("system", t => addSystem(t));
+socket.on("history", addBubble);
+socket.on("chat", addBubble);
+socket.on("system", addSystem);
+
+};
 </script>
+
 </body>
 </html>`);
 });
@@ -236,10 +241,10 @@ io.on("connection", socket => {
     if (socket.username) return;
     socket.username = name;
 
-    const result = await pool.query(
-      "SELECT name, text, image FROM messages ORDER BY id ASC LIMIT 100"
+    const r = await pool.query(
+      "SELECT name,text,image FROM messages ORDER BY id ASC LIMIT 100"
     );
-    result.rows.forEach(row => socket.emit("history", row));
+    r.rows.forEach(row => socket.emit("history", row));
 
     io.emit("system", "🔔 " + name + " が入室しました");
   });
@@ -254,7 +259,7 @@ io.on("connection", socket => {
     };
 
     await pool.query(
-      "INSERT INTO messages (name, text, image) VALUES ($1,$2,$3)",
+      "INSERT INTO messages (name,text,image) VALUES ($1,$2,$3)",
       [msg.name, msg.text, msg.image]
     );
 
@@ -265,20 +270,6 @@ io.on("connection", socket => {
     if (socket.username) {
       io.emit("system", "🚪 " + socket.username + " が退出しました");
     }
-  });
-
-  socket.on("admin-check", password => {
-    if (password === process.env.ADMIN_PASSWORD) {
-      socket.isAdmin = true;
-      socket.emit("admin-ok");
-    }
-  });
-
-  socket.on("admin-clear", async () => {
-    if (!socket.isAdmin) return;
-
-    await pool.query("DELETE FROM messages");
-    io.emit("system", "🗑 管理者により履歴が削除されました");
   });
 });
 
