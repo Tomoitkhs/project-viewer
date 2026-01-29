@@ -252,6 +252,11 @@ msgInput.addEventListener("keydown", e => {
 socket.on("history", addBubble);
 socket.on("chat", addBubble);
 socket.on("system", addSystem);
+socket.on("clear-screen", () => {
+  messages.innerHTML = "";
+  window.scrollTo(0, 0);
+});
+
 
 };
 </script>
@@ -309,8 +314,13 @@ io.on("connection", socket => {
     if (!socket.isAdmin) return;
 
     await pool.query("DELETE FROM messages");
-    io.emit("system", "🗑 管理者により履歴が削除されました");
+
+    // 全員の画面を即クリアさせる
+    io.emit("clear-screen");
+
+    io.emit("system", "🧹 管理者により履歴が削除されました");
   });
+
 
 
   
