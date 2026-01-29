@@ -118,8 +118,14 @@ body {
 
 <div id="header">
   <div>📘 Project Viewer</div>
-  <div id="myNameView"></div>
+  <div>
+    <span id="myNameView"></span>
+    <button id="adminClearBtn" style="display:none;">
+      🗑 履歴削除
+    </button>
+  </div>
 </div>
+
 
 <div id="container">
   <div id="nameArea">
@@ -152,6 +158,26 @@ const msgInput = document.getElementById("msg");
 const imageInput = document.getElementById("imageInput");
 
 let myName = localStorage.getItem("chatName");
+
+const adminBtn = document.getElementById("adminClearBtn");
+
+// 管理者パスワード入力
+const adminPassword = prompt("管理者ですか？（違ったらキャンセル）");
+
+if (adminPassword) {
+  socket.emit("admin-check", adminPassword);
+}
+
+// 管理者OKが返ってきたらボタン表示
+socket.on("admin-ok", () => {
+  adminBtn.style.display = "inline-block";
+});
+
+adminBtn.onclick = () => {
+  if (!confirm("履歴をすべて削除します。よろしいですか？")) return;
+  socket.emit("admin-clear");
+};
+
 
 function addBubble(data) {
   const div = document.createElement("div");
@@ -271,6 +297,23 @@ io.on("connection", socket => {
       io.emit("system", "🚪 " + socket.username + " が退出しました");
     }
   });
+  
+  socket.on("admin-check", password => {
+    if (password === process.env.ADMIN_PASSWORD) {
+      socket.isAdmin = true;
+      socket.emit("admin-ok");
+    }
+  });
+  
+  socket.on("admin-clear", async () => {
+    if (!socket.isAdmin) return;
+
+    await pool.query("DELETE FROM messages");
+    io.emit("system", "🗑 管理者により履歴が削除されました");
+  });
+
+
+  
 });
 
 // ===== 起動 =====
