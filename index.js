@@ -141,7 +141,7 @@ body {
   <input type="file" id="imageInput" accept="image/*">
   <input id="msg" placeholder="メッセージ（Enter送信 / Shift+Enter改行）">
   <button id="sendBtn">送信</button>
-  <button onclick="localStorage.clear(); location.reload();">localStorage削除</button>
+  
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
