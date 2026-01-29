@@ -120,6 +120,7 @@ body {
   <div>📘 Project Viewer</div>
   <div>
     <span id="myNameView"></span>
+    <span id="onlineCount" style="margin-left:10px;">🟢 Online: 0</span>
     <button id="adminClearBtn" style="display:none;">
       🗑 履歴削除
     </button>
@@ -156,6 +157,12 @@ const nameInput = document.getElementById("nameInput");
 const myNameView = document.getElementById("myNameView");
 const msgInput = document.getElementById("msg");
 const imageInput = document.getElementById("imageInput");
+const onlineCount = document.getElementById("onlineCount");
+
+socket.on("online-count", count => {
+  onlineCount.textContent = "🟢 Online: " + count;
+});
+
 
 let myName = localStorage.getItem("chatName");
 
@@ -266,8 +273,11 @@ socket.on("clear-screen", () => {
 });
 
 // ===== Socket.io =====
-io.on("connection", socket => {
+let onlineUsers = 0;
 
+io.on("connection", socket => {
+  onlineUsers++;
+  io.emit("online-count", onlineUsers);
   socket.on("join", async name => {
     if (socket.username) return;
     socket.username = name;
@@ -298,6 +308,9 @@ io.on("connection", socket => {
   });
 
   socket.on("disconnect", () => {
+    onlineUsers--;
+    if (onlineUsers < 0) onlineUsers = 0;
+    io.emit("online-count", onlineUsers);
     if (socket.username) {
       io.emit("system", "🚪 " + socket.username + " が退出しました");
     }
